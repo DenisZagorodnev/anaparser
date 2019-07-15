@@ -10,6 +10,8 @@ import xlrd
 import csv
 import os
 
+
+
 #%%
 def csv_from_excel(input_file, output_file):
 
@@ -30,7 +32,7 @@ def csv_from_excel(input_file, output_file):
 
 
 
-cons = pd.read_csv(os.path.join(os.path.dirname(__file__), 'М60.01_CONS.csv'), sep = ';')
+
 
 
 # In[26]:
@@ -38,11 +40,7 @@ cons = pd.read_csv(os.path.join(os.path.dirname(__file__), 'М60.01_CONS.csv'), 
 
 
     
-base_cons_dimension = ''
-if type(cons['Applies To'][0]) != float:
-    base_cons_dimension = cons['Applies To'][0]
-else:
-    None
+
 
 
 # In[27]:
@@ -153,7 +151,7 @@ def find_all_substrings(string):
 
 
 #Найти к каким CONS ведет финальный показатель
-def find_conses(string):
+def find_conses(string, cons):
    # print(string[23], '\n')
     conses = []
     string = string[23]
@@ -193,9 +191,9 @@ def find_essences(string):
 # In[38]:
 
 
-def cons_staff(string):
+def cons_staff(string, cons):
     #print(type(string))
-    conses = find_conses(string)
+    conses = find_conses(string, cons)
     Apto = []
     Essencies = []
     for item in conses:
@@ -228,7 +226,7 @@ class file_parser:
     В ином случае взятие и сохранение будут производиться в текущей директории (если это возможно).
     """
     
-    def __init__(self, **args):
+    def __init__(self, dict_name, **args):
     
         
         if 'Input_path' in args:
@@ -240,8 +238,11 @@ class file_parser:
             self.Output_path = args['Output_path']
         else: 
             self.Output_path = -1
+         
+        
             
-       
+            
+        self.cons = pd.read_csv(dict_name, sep = ';')
             
     def parse_file(self, fname):
      """
@@ -249,7 +250,8 @@ class file_parser:
      Создает по выбранному ранее адресу три файла: 1.Входные данные, 2.Итоговые показатели, 3.Промежуточные показатели.
      
      """
-      
+     cons = self.cons
+     
      if fname.endswith('.xls') or fname.endswith('.csv'):
         self.fname = fname
      else:
@@ -346,7 +348,7 @@ class file_parser:
                 else:
                     Final_marker.append(raw[0])
                     Final_module_name.append(base_name)
-                    essencies, apto = cons_staff(raw)
+                    essencies, apto = cons_staff(raw, cons)
                     Final_applies.append(str(list(set(apto))).strip("[]"))
                     Final_essence.append(str(essencies).strip("[]"))
     
@@ -376,7 +378,111 @@ class file_parser:
          Interm_data = pd.DataFrame({'Рассчетный показатель': Interm_marker, 'Модуль': Interm_module_name})
          Interm_data.to_excel("Промежуточные_показатели.xlsx")
 
- 
+#%% 
+class cons_parser(file_parser):
+    def __init__(self, **args):
+            
+            if 'Input_path' in args:
+                self.Input_path = args['Input_path']
+            else:
+                self.Input_path = -1
                 
+            if 'Output_path' in args:
+                self.Output_path = args['Output_path']
+            else: 
+                self.Output_path = -1                
     
 
+    def parse_file(self, fname):
+     if fname.endswith('.xls') or fname.endswith('.csv'):
+        self.fname = fname
+     else:
+        raise Exception('Это не Excel или csv файл, давайте другой.')
+        
+     fname = self.fname
+     
+     origin = ''
+     fname_csv = fname
+     separator  = ';'
+     base_name = ''
+     
+      #Если это НЕ csv файл 
+      
+     if fname.find('csv') == -1:
+         
+         base_name = fname.replace('.xls', '')
+         #fname_csv = '/Users/deniszagorodnev/Desktop/anaplan_parse/' + fname
+        # fname_csv = fname_csv.replace('xls', 'csv')
+         if self.Input_path != -1:
+             fname = self.Input_path + fname
+         #separator = ','
+         origin = pd.read_excel(fname, header = 0)
+         
+         
+      #Если это csv файл   
+     if fname.find('csv') != -1:
+         if self.Input_path != -1:
+             fname = self.Input_path + fname
+         origin = pd.read_csv(fname_csv, sep = separator)
+         base_name = fname.replace('.csv', '')
+         
+     base_module_dimension = ''
+     
+     if type(origin['Applies To'][0]) != float:
+       base_module_dimension = origin['Applies To'][0]
+     else:
+        None
+        
+     def check_dimension(string):
+        if type(string) == float:
+            return '' 
+        else:
+            if string == '-':
+                return base_module_dimension
+            else:
+                return string
+            
+     Item_name = []
+     Item_formula = []
+     Applies_to = []
+     Comment = []
+     
+     for raw in origin.values:
+         if check_formula(raw[1]) == 'intro' and check_format(raw[4]) == 'NONE':
+             Item_name.append(raw[0])
+             Item_formula.append('')
+             Applies_to.append('')
+             Comment.append('Подзаголовок!')
+             
+         elif check_formula(raw[1]) == 'intro' and check_format(raw[4]) != 'NONE':
+              Item_name.append(raw[0])
+              Item_formula.append('')
+              Applies_to.append(check_time(raw[6]) + ' ' + check_version(raw[8]) + ' '+ check_dimension(raw[5]))
+              Comment.append('')
+              
+         elif check_formula(raw[1]) != 'intro':
+             Item_name.append(raw[0])
+             Item_formula.append(raw[1])
+             Applies_to.append(check_time(raw[6]) + ' ' + check_version(raw[8]) + ' '+ check_dimension(raw[5]))
+             Comment.append('')
+             
+        
+         
+     
+     if self.Output_path != -1:
+         
+        
+         Intro_data = pd.DataFrame({'Item': Item_name,'Cut up': Applies_to, 'Formula': Item_formula, 'Comment': Comment})
+         Intro_data.to_excel(self.Output_path + "CONS.xlsx")
+         
+         
+         
+     else:
+         Intro_data = pd.DataFrame({'Item': Item_name,'Cut up': Applies_to, 'Formula': Item_formula, 'Comment': Comment})
+         Intro_data.to_excel("CONS.xlsx")
+         
+            
+            
+            
+            
+            
