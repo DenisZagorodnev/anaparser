@@ -6,14 +6,10 @@ Created on Mon Jul  8 14:50:38 2019
 @author: deniszagorodnev
 """
 
-import anaplan_parser as ap
+from anaparser import anaplan_parser
 
-fname = 'М30.34 Затраты на возобновление CAPEX СМК Отчет.xls'
+fname = 'M61.51.1 Финансовые показатели.xls'
+dict_name = 'М60.01_CONS.csv'
+path = '/Users/deniszagorodnev/Desktop/'
 
-
-Input_path = '/Users/deniszagorodnev/Desktop/'
-Output_path = '/Users/deniszagorodnev/Desktop/anaplan_parse/'
-
-parser = ap.file_parser(Input_path = Input_path, Output_path = Output_path)
-
-parser.parse_file(fname)
+anaplan_parser.file_parser(path + dict_name, Input_path = path, Output_path = path).parse_file(fname)
